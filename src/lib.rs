@@ -2,6 +2,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::{Base64VecU8};
 use near_sdk::{env, near_bindgen, ext_contract, Gas};
+use serde::Deserialize;
 //use serde::{Serialize, Deserialize};
 
 near_sdk::setup_alloc!();
@@ -13,21 +14,20 @@ pub struct Daobot {
 }
 
 
-// #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
-// pub struct ProposalOutput {
-//     /// Id of the proposal.
-//     pub id: u64,
-//     #[serde(flatten)]
-//     pub proposal: Proposal,
-// }
+#[derive(Deserialize)]
+#[derive(Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Proposal {
+    id: u64,
+}
 
 
 // Trigger macro to create interfact to external contract.
 #[ext_contract(ext_astrodao)]
 pub trait Astrodao {
      fn version(&self) -> String;
-     fn get_proposals(&self, from_index: u64, limit: u64) -> Vec<(u64, String, String, Base64VecU8, String, Base64VecU8, Base64VecU8, String)>;
-    fn get_proposal(&self, id: u64) -> (u64, String, String, Base64VecU8, String, Base64VecU8, Base64VecU8, String);
+     fn get_proposals(&self, from_index: u64, limit: u64) -> Vec<Proposal>;
+    fn get_proposal(&self, id: u64) -> Proposal;
      fn act_proposal(&self, id: u64, action: String);
 }
 
@@ -36,8 +36,8 @@ pub trait Astrodao {
 // Recieve callbacks from external contract.
 #[ext_contract(ext_self)]
 trait Callbacks {
-    fn on_get_proposals(&self,#[callback] proposals: Vec<(u64, String, String, Base64VecU8, String, Base64VecU8, Base64VecU8, String)>);
-    fn on_get_proposal(&self,#[callback] proposal: (u64, String, String, Base64VecU8, String, Base64VecU8, Base64VecU8, String));
+    fn on_get_proposals(&self,#[callback] proposals: Vec<Proposal>);
+    fn on_get_proposal(&self,#[callback] proposal: Proposal);
 }   
 
 impl Default for Daobot {
@@ -77,16 +77,16 @@ impl Daobot {
         }
 
     #[private]
-    pub fn on_get_proposals(&self, #[callback] proposals: Vec<(u64, String, String, Base64VecU8, String, Base64VecU8, Base64VecU8, String)>)  {
+    pub fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>)  {
 
-        proposals.iter().for_each(|(id, _action, _proposer, _proposal, _proposal_hash, _proposal_hash_signature, _proposal_signature, _proposal_signature_signature)| {
-            ext_astrodao::act_proposal(*id, "VoteApprove".to_string(), &env::current_account_id(), 0, GAS_FOR_COMMON_OPERATIONS);
+        proposals.iter().for_each(|proposal: &Proposal| {
+            ext_astrodao::act_proposal(proposal.id, "VoteApprove".to_string(), &env::current_account_id(), 0, GAS_FOR_COMMON_OPERATIONS);
         });
     }
 
     #[private]
-    pub fn on_get_proposal(&self, #[callback] proposal: (u64, String, String, Base64VecU8, String, Base64VecU8, Base64VecU8, String)) -> u64 {
-        let id = proposal.0;
+    pub fn on_get_proposal(&self, #[callback] proposal: Proposal) -> u64 {
+        let id = proposal.id;
 
 
         let available_gas = env::prepaid_gas();
