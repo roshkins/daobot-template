@@ -1,6 +1,6 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
-use near_sdk::json_types::{Base64VecU8};
+use near_sdk::json_types::{Base64VecU8, U64};
 use near_sdk::{env, near_bindgen, ext_contract, Gas};
 use serde::Deserialize;
 //use serde::{Serialize, Deserialize};
@@ -26,9 +26,9 @@ pub struct Proposal {
 #[ext_contract(ext_astrodao)]
 pub trait Astrodao {
      fn version(&self) -> String;
-     fn get_proposals(&self, from_index: u64, limit: u64) -> Vec<Proposal>;
-    fn get_proposal(&self, id: u64) -> Proposal;
-     fn act_proposal(&self, id: u64, action: String);
+     fn get_proposals(&self, from_index: U64, limit: U64) -> Vec<Proposal>;
+    fn get_proposal(&self, id: U64) -> Proposal;
+     fn act_proposal(&self, id: U64, action: String);
 }
 
 
@@ -36,7 +36,7 @@ pub trait Astrodao {
 // Recieve callbacks from external contract.
 #[ext_contract(ext_self)]
 trait Callbacks {
-    fn on_get_proposals(&self,#[callback] proposals: Vec<Proposal>);
+    fn on_get_proposals(&self, dao_id: AccountId, #[callback] proposals: Vec<Proposal>);
     fn on_get_proposal(&self,#[callback] proposal: Proposal);
 }   
 
@@ -54,7 +54,7 @@ pub const GAS_FOR_COMMON_OPERATIONS: Gas = 30_000_000_000_000;
 // Gas reserved for the current call.
 pub const GAS_RESERVED_FOR_CURRENT_CALL: Gas = 20_000_000_000_000;
 
-pub const GAS_ESTIMATE: Gas = 10_000_000_000_000;
+pub const GAS_ESTIMATE: Gas = 10_000_000_000;
 #[near_bindgen]
 impl Daobot {
 
@@ -72,31 +72,17 @@ impl Daobot {
     }
 
     pub fn approve_members(&self, dao_id: String){
-        ext_astrodao::get_proposals(0, 100, &dao_id, 0, GAS_FOR_COMMON_OPERATIONS ).then(
-            ext_self::on_get_proposals(&env::current_account_id(), 0, GAS_FOR_COMMON_OPERATIONS));    
+ 
+        ext_astrodao::get_proposals(U64(0), U64(100), &dao_id, 0, GAS_ESTIMATE ).then(
+            ext_self::on_get_proposals(dao_id,&env::current_account_id(), 0, GAS_ESTIMATE * 100));    
         }
 
     #[private]
-    pub fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>)  {
+    pub fn on_get_proposals(&self, dao_id: &near_sdk::AccountId, #[callback] proposals: Vec<Proposal>)  {
 
-        proposals.iter().for_each(|proposal: &Proposal| {
-            ext_astrodao::act_proposal(proposal.id, "VoteApprove".to_string(), &env::current_account_id(), 0, GAS_FOR_COMMON_OPERATIONS);
-        });
-    }
-
-    #[private]
-    pub fn on_get_proposal(&self, #[callback] proposal: Proposal) -> u64 {
-        let id = proposal.id;
-
-
-        let available_gas = env::prepaid_gas();
-        let remaining_gas: Gas = env::prepaid_gas()
-        - env::used_gas()
-        - GAS_FOR_COMMON_OPERATIONS
-        - GAS_RESERVED_FOR_CURRENT_CALL;
-        ext_astrodao::act_proposal(id, "VoteApprove".to_string(),&env::current_account_id(), 0, available_gas ).then(
-            ext_self::on_get_proposal(&env::current_account_id(), 0, remaining_gas));   
-        return id;
+        let last_proposal_id = proposals.last().map(|p| p.id).unwrap_or(0);
+        ext_astrodao::act_proposal(U64(last_proposal_id), "VoteApprove".to_string(), &dao_id, 0, GAS_ESTIMATE);
+      
     }
 }
 
