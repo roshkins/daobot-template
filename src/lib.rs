@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::{Base64VecU8, U64};
-use near_sdk::{env, near_bindgen, ext_contract, Gas};
+use near_sdk::{env, near_bindgen, ext_contract, Gas, Promise, log};
 use serde::Deserialize;
 //use serde::{Serialize, Deserialize};
 
@@ -26,7 +26,7 @@ pub struct Proposal {
 #[ext_contract(ext_astrodao)]
 pub trait Astrodao {
      fn version(&self) -> String;
-     fn get_proposals(&self, from_index: U64, limit: U64) -> Vec<Proposal>;
+     fn get_proposals(&self, from_index: u64, limit: u64) -> Vec<Proposal>;
     fn get_proposal(&self, id: U64) -> Proposal;
      fn act_proposal(&self, id: U64, action: String);
 }
@@ -38,6 +38,7 @@ pub trait Astrodao {
 trait Callbacks {
     fn on_get_proposals(&self, dao_id: AccountId, #[callback] proposals: Vec<Proposal>);
     fn on_get_proposal(&self,#[callback] proposal: Proposal);
+    fn panic_debug(&self);
 }   
 
 impl Default for Daobot {
@@ -47,6 +48,7 @@ impl Default for Daobot {
         }
     }
 }
+
 
 // Gas needed for common operations.
 pub const GAS_FOR_COMMON_OPERATIONS: Gas = 30_000_000_000_000;
@@ -71,18 +73,33 @@ impl Daobot {
         return "Something".to_string() + &arg1;
     }
 
-    pub fn approve_members(&self, dao_id: String){
- 
-        ext_astrodao::get_proposals(U64(0), U64(100), &dao_id, 0, GAS_ESTIMATE ).then(
-            ext_self::on_get_proposals(dao_id,&env::current_account_id(), 0, GAS_ESTIMATE * 100));    
+    pub fn panic_debug(&self) {
+        log!("Gas {:?}", env::prepaid_gas() - env::used_gas());
+    }
+
+    pub fn approve_members(&self, dao_id: String) {
+        let total_gas = env::prepaid_gas();
+        let num_calls = 6;
+        let gas_per_call = total_gas / num_calls;
+
+        log!("Used gas: {:?} out of {:?}", env::used_gas(), env::prepaid_gas());
+        let callback = ext_self::on_get_proposals(dao_id.clone(),&env::current_account_id(), 0, 28860827153770);
+        log!("Callback defined,  gas: {:?} out of {:?}", env::used_gas(), env::prepaid_gas());
+        ext_astrodao::get_proposals(0, 1, &dao_id, 0, gas_per_call )
+        .then(callback);
+        log!("After get_proposals Used gas: {:?} out of {:?}", env::used_gas(), env::prepaid_gas());
+
+            
+        // .then(
+        // 
         }
 
-    #[private]
+    // #[private]
     pub fn on_get_proposals(&self, dao_id: &near_sdk::AccountId, #[callback] proposals: Vec<Proposal>)  {
-
-        let last_proposal_id = proposals.last().map(|p| p.id).unwrap_or(0);
-        ext_astrodao::act_proposal(U64(last_proposal_id), "VoteApprove".to_string(), &dao_id, 0, GAS_ESTIMATE);
-      
+        // panic!("Gas Available {:?}",  env::prepaid_gas() - env::used_gas());
+        // let last_proposal_id = proposals.last().map(|p| p.id).unwrap_or(0);
+        // ext_astrodao::act_proposal(U64(last_proposal_id), "VoteApprove".to_string(), &dao_id, 0, 288608271537707-GAS_FOR_COMMON_OPERATIONS);
+      1+1;
     }
 }
 
