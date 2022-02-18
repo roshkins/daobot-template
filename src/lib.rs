@@ -47,6 +47,7 @@ pub struct Proposal {
 pub trait Astrodao {
      fn version(&self) -> String;
      fn get_proposals(&self, from_index: u64, limit: u64) -> Vec<Proposal>;
+    fn get_proposal(&self, id: u64) -> Proposal;
      fn act_proposal(&self, id: u64, action: String);
      fn get_last_proposal_id(&self) -> u64;
 }
@@ -57,7 +58,8 @@ pub trait Astrodao {
 #[ext_contract(ext_self)]
 trait Callbacks {
     fn on_get_proposals(&self, dao_id: AccountId, #[callback] proposals: Vec<Proposal>);
-    fn on_get_last_proposal_id(&self, dao_id: AccountId, #[callback] last_proposal_id: u64);
+    fn on_get_proposal(&self, dao_id: AccountId, #[callback] proposal: Proposal);
+    fn on_get_last_proposal_id(&self,dao_id: AccountId, #[callback] last_proposal_id: u64);
     fn proposal_approved(&self, id: u64);
 }   
 
@@ -67,46 +69,60 @@ impl Default for Daobot {
         }
     }
 }
+pub const GAS_FOR_DAO_CALL: u64 = 10_000_000_000_000;
+pub const GAS_MARGIN: u64 = 500_000_000_000;
 
 #[near_bindgen]
 impl Daobot {
 
     pub fn approve_members(&self, dao_id: AccountId) {
-        let total_gas = env::prepaid_gas();
-        let num_calls = 6;
-        let gas_per_call = total_gas / num_calls;
+    
+        let callback = ext_self::on_get_last_proposal_id( dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_CALL - GAS_MARGIN);
+        ext_astrodao::get_last_proposal_id(&dao_id, 0, GAS_FOR_DAO_CALL).then(callback);
 
-        let callback = ext_self::on_get_last_proposal_id(dao_id.clone(), &env::current_account_id(), 0, gas_per_call);
-        ext_astrodao::get_last_proposal_id(&dao_id, 0, gas_per_call).then(callback);
 }
 
     #[private]
     pub fn on_get_last_proposal_id(&self, dao_id: AccountId, #[callback] last_proposal_id: u64) {
-        let total_gas = env::prepaid_gas();
-        let num_calls = 6;
-        let gas_per_call = total_gas / num_calls;
-        let callback = ext_self::on_get_proposals(dao_id.clone(),&env::current_account_id(), 0, gas_per_call);
-        log!("on_get_last_proposal_id: {:?}", last_proposal_id);
         
-        ext_astrodao::get_proposals(max(100,last_proposal_id)-100, 100, &dao_id, 0, gas_per_call*2 )
-        .then(callback);
+        // let callback = ext_self::on_get_proposals(dao_id.clone(),&env::current_account_id(), 0, gas_per_call);
+        let mono_callback = ext_self::on_get_proposal(dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_CALL - GAS_MARGIN);
+        ext_astrodao::get_proposal(last_proposal_id, &dao_id, 0, GAS_FOR_DAO_CALL).then(mono_callback);
+        // ext_astrodao::get_proposals(max(100,last_proposal_id)-100, 100, &dao_id, 0, gas_per_call*2 )
+        // .then(callback);
     }
 
     #[private]
     pub fn on_get_proposals(&self, dao_id: &near_sdk::AccountId, #[callback] proposals: Vec<Proposal>)  {
+        
         let mut active_proposals = proposals.iter().filter(|p| p.status == "InProgress".to_string() && p.kind == ProposalKinds::AddMemberToRole{} ).peekable();
         if active_proposals.peek().is_none() {
             panic!("No active proposals");
         }
-        log!("Used gas in callback: {:?} out of {:?}", env::used_gas(), env::prepaid_gas());
-        let proposal_ids = active_proposals.map(|p| p.id).collect::<Vec<u64>>();
-        let proposal_id_count = (proposal_ids.len()) as u64 * 4;
+         let proposal_ids = active_proposals.map(|p| p.id).collect::<Vec<u64>>();
+        let proposal_id_count = (proposal_ids.len()) as u64;
+        
+        const ESTIMATED_USED_GAS: u64 = 7e12 as u64;
+        let remaining_gas = env::prepaid_gas() - env::used_gas() - ESTIMATED_USED_GAS;
+        // 2 calls plus one extra for overhead
+        const CALLS_PER_LOOP: u64 = 3;
+        let gas_per_call = remaining_gas / (proposal_id_count * CALLS_PER_LOOP);
+        log!("Gas per call: {:?}", gas_per_call);
         proposal_ids.iter().for_each(|id| {  
-            let approved = ext_self::proposal_approved(*id, &env::current_account_id(),0, env::prepaid_gas()/proposal_id_count);
-            ext_astrodao::act_proposal(*id, "VoteApprove".to_string(), &dao_id, 0, env::prepaid_gas()/proposal_id_count).then(approved);
-
+            log!("Remaining gas: {:?}", env::prepaid_gas() - env::used_gas());
+            // let approved =
+              ext_self::proposal_approved(*id, &env::current_account_id(),0, gas_per_call);
+            //ext_astrodao::act_proposal(*id, "VoteApprove".to_string(), &dao_id, 0, gas_per_call).then(approved);
         });
       
+    }
+
+    #[private]
+    pub fn on_get_proposal(&self, dao_id: &near_sdk::AccountId, #[callback] proposals: Proposal)  {
+
+        let proposal_id = proposals.id;
+        //let cb = ext_self::proposal_approved(proposal_id, &env::current_account_id(),0, gas_per_call);
+        ext_astrodao::act_proposal(proposal_id, "VoteApprove".to_string(), &dao_id, 0, GAS_FOR_DAO_CALL);
     }
 
     #[private]
