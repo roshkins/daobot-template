@@ -70,7 +70,7 @@ impl Default for Daobot {
     }
 }
 pub const GAS_FOR_DAO_CALL: u64 = 10_000_000_000_000;
-pub const GAS_MARGIN: u64 = 500_000_000_000;
+pub const GAS_MARGIN: u64 = 10_000_000_000_000;
 
 #[near_bindgen]
 impl Daobot {
@@ -87,7 +87,7 @@ impl Daobot {
         
         // let callback = ext_self::on_get_proposals(dao_id.clone(),&env::current_account_id(), 0, gas_per_call);
         let mono_callback = ext_self::on_get_proposal(dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_CALL - GAS_MARGIN);
-        ext_astrodao::get_proposal(last_proposal_id, &dao_id, 0, GAS_FOR_DAO_CALL).then(mono_callback);
+        ext_astrodao::get_proposal(last_proposal_id-1, &dao_id, 0, GAS_FOR_DAO_CALL).then(mono_callback);
         // ext_astrodao::get_proposals(max(100,last_proposal_id)-100, 100, &dao_id, 0, gas_per_call*2 )
         // .then(callback);
     }
