@@ -2,52 +2,16 @@ import "regenerator-runtime/runtime";
 import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Big from "big.js";
-import Form from "./components/Form";
+import SetupDaoForm from "./components/SetupDaoForm";
 
 const BOATLOAD_OF_GAS = Big(3).times(10 ** 13).toFixed();
 
-const App = ({ contract, currentUser, nearConfig, wallet }) => {
-  const [status, setStatus] = useState(null);
-
-  useEffect(async () => {
-    if (currentUser) {
-      const status = await contract.get_status({
-        account_id: currentUser.accountId
-      });
-
-      setStatus(status);
-    }
-  });
-
-  const onSubmit = async event => {
-    event.preventDefault();
-
-    const { fieldset, message } = event.target.elements;
-    fieldset.disabled = true;
-
-    await contract.set_status(
-      {
-        message: message.value,
-        account_id: currentUser.accountId
-      },
-      BOATLOAD_OF_GAS
-    );
-
-    const status = await contract.get_status({
-      account_id: currentUser.accountId
-    });
-
-    setStatus(status);
-
-    message.value = "";
-    fieldset.disabled = false;
-    message.focus();
-  };
+const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
 
   const signIn = () => {
     wallet.requestSignIn(
       nearConfig.contractName,
-      "NEAR Status Message"
+      "AutoDAO"
     );
   };
 
@@ -56,50 +20,83 @@ const App = ({ contract, currentUser, nearConfig, wallet }) => {
     window.location.replace(window.location.origin + window.location.pathname);
   };
 
+  const [dao, setDao] = useState("");
+
+  const registerDaoBotWithDao = async () => {
+    const daocontract = await new nearApi.Contract(wallet.account(), dao, {
+      viewMethods: ["get_policy"],
+      changeMethods: ["add_proposal"],
+      sender: wallet.getAccountId()
+    });
+
+    const policy = await daocontract.get_policy();
+    const newRole = { ...policy.roles[1], name: "DAO Bot", kind: { Group: [contract.contractId] } };
+    policy.roles.push(newRole);
+    await daocontract.add_proposal({
+      proposal: {
+        description: "Add DAO Bot role",
+        kind: {
+          ChangePolicy: {
+            policy: policy
+          }
+        }
+      }
+    }, "300000000000000", // attached GAS (optional)
+      "1000000000000000000000000" // attached deposit in yoctoNEAR (optional));
+    );
+  };
+
+  const registerCroncat = async () => {
+    const croncatContract = await new nearApi.Contract(wallet.account(), "manager_v1.croncat.testnet", {
+      changeMethods: ["create_task"],
+      sender: wallet.getAccountId()
+    });
+
+    const taskArgs = {
+      "contract_id": contract.contractId,
+      "function_id": "approve_members",
+      "cadence": "*/10 * * * * *",
+      "recurring": true,
+      "deposit": "0",
+      "gas": 240000000000000,
+      "arguments": btoa(JSON.stringify({ 'dao_id': dao }))
+    };
+
+    await croncatContract.create_task(taskArgs, BOATLOAD_OF_GAS, "10000000000000000000000000");
+
+  };
+
   return (
     <main>
       <header>
-        <h1>NEAR Status Message</h1>
+        <h1>AutoDAO Message</h1>
 
         {currentUser ?
           <p>Currently signed in as: <code>{currentUser.accountId}</code></p>
-        :
-          <p>Update or add a status message! Please login to continue.</p>
+          :
+          <p>Add an AutoDAO bot! Please login to continue.</p>
         }
 
-        { currentUser
+        {currentUser
           ? <button onClick={signOut}>Log out</button>
           : <button onClick={signIn}>Log in</button>
         }
       </header>
 
-      {currentUser &&
-        <Form
-          onSubmit={onSubmit}
-          currentUser={currentUser}
-        />
-      }
+      {currentUser && < SetupDaoForm daoId={dao} setDaoId={(id) => setDao(id)} onSubmit={(e) => { registerDaoBotWithDao(); e.preventDefault(); }} />}
 
-      {status ?
-        <>
-          <p>Your current status:</p>
-          <p>
-            <code>
-              {status}
-            </code>
-          </p>
-        </>
-      :
-        <p>No status message yet!</p>
-      }
+      {currentUser && <p>Click to go to the DAO and approve the proposal: <a href={"https://testnet-v2.sputnik.fund/#/" + dao} target="_blank">DAO Link</a></p>}
+
+      {currentUser && <button onClick={() => { registerCroncat(); e.preventDefault() }}>Register Croncat</button>}
+
+      {currentUser && <p> Try creating a new proposal to add a member to the dao, it should approve the proposal automatically.</p>}
+
     </main>
   );
 };
 
 App.propTypes = {
   contract: PropTypes.shape({
-    set_status: PropTypes.func.isRequired,
-    get_status: PropTypes.func.isRequired
   }).isRequired,
   currentUser: PropTypes.shape({
     accountId: PropTypes.string.isRequired,

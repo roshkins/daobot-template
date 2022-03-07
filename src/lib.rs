@@ -69,6 +69,7 @@ impl Default for Daobot {
         }
     }
 }
+pub const GAS_FOR_DAO_VIEW: u64 = 6_000_000_000_000;
 pub const GAS_FOR_DAO_CALL: u64 = 10_000_000_000_000;
 pub const GAS_MARGIN: u64 = 10_000_000_000_000;
 
@@ -77,8 +78,8 @@ impl Daobot {
 
     pub fn approve_members(&self, dao_id: AccountId) {
     
-        let callback = ext_self::on_get_last_proposal_id( dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_CALL - GAS_MARGIN);
-        ext_astrodao::get_last_proposal_id(&dao_id, 0, GAS_FOR_DAO_CALL).then(callback);
+        let callback = ext_self::on_get_last_proposal_id( dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_VIEW - GAS_MARGIN);
+        ext_astrodao::get_last_proposal_id(&dao_id, 0, GAS_FOR_DAO_VIEW).then(callback);
 
 }
 
@@ -86,8 +87,8 @@ impl Daobot {
     pub fn on_get_last_proposal_id(&self, dao_id: AccountId, #[callback] last_proposal_id: u64) {
         
         // let callback = ext_self::on_get_proposals(dao_id.clone(),&env::current_account_id(), 0, gas_per_call);
-        let mono_callback = ext_self::on_get_proposal(dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_CALL - GAS_MARGIN);
-        ext_astrodao::get_proposal(last_proposal_id-1, &dao_id, 0, GAS_FOR_DAO_CALL).then(mono_callback);
+        let mono_callback = ext_self::on_get_proposal(dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_VIEW - GAS_MARGIN);
+        ext_astrodao::get_proposal(last_proposal_id-1, &dao_id, 0, GAS_FOR_DAO_VIEW).then(mono_callback);
         // ext_astrodao::get_proposals(max(100,last_proposal_id)-100, 100, &dao_id, 0, gas_per_call*2 )
         // .then(callback);
     }

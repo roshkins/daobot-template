@@ -1,5 +1,6 @@
 const CONTRACT_NAME = process.env.CONTRACT_NAME || "testnet";
 
+
 function getConfig(env) {
   switch(env) {
     case 'mainnet':
