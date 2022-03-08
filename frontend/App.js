@@ -23,6 +23,7 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
   const [dao, setDao] = useState("");
 
   const registerDaoBotWithDao = async () => {
+    if (!dao) { alert("Please enter a dao address"); return; }
     const daocontract = await new nearApi.Contract(wallet.account(), dao, {
       viewMethods: ["get_policy"],
       changeMethods: ["add_proposal"],
@@ -47,6 +48,7 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
   };
 
   const registerCroncat = async () => {
+    if (!dao) { alert("Please enter a dao address"); return; }
     const croncatContract = await new nearApi.Contract(wallet.account(), "manager_v1.croncat.testnet", {
       changeMethods: ["create_task"],
       sender: wallet.getAccountId()
@@ -62,7 +64,7 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
       "arguments": btoa(JSON.stringify({ 'dao_id': dao }))
     };
 
-    await croncatContract.create_task(taskArgs, BOATLOAD_OF_GAS, "10000000000000000000000000");
+    const taskId = await croncatContract.create_task(taskArgs, BOATLOAD_OF_GAS, "1000000000000000000000000");
 
   };
 
@@ -87,7 +89,7 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
 
       {currentUser && <p>Click to go to the DAO and approve the proposal: <a href={"https://testnet-v2.sputnik.fund/#/" + dao} target="_blank">DAO Link</a></p>}
 
-      {currentUser && <button onClick={() => { registerCroncat(); e.preventDefault() }}>Register Croncat</button>}
+      {currentUser && <button onClick={(e) => { registerCroncat(); e.preventDefault() }}>Register Croncat</button>}
 
       {currentUser && <p> Try creating a new proposal to add a member to the dao, it should approve the proposal automatically.</p>}
 
