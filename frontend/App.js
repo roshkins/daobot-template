@@ -68,6 +68,7 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
 
   };
 
+  // Use get_hash to check for created task: https://github.com/CronCats/cron-ui/blob/main/src/pages/Tasks.vue#L320
   return (
     <main>
       <header>
