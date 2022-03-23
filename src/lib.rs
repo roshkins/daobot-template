@@ -2,6 +2,7 @@ use std::cmp::max;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, env, near_bindgen, ext_contract, log};
+use near_contract_standards::non_fungible_token::enumeration::NonFungibleTokenEnumeration;
 use serde::Deserialize;
 
 near_sdk::setup_alloc!();
@@ -9,6 +10,7 @@ near_sdk::setup_alloc!();
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Daobot {
+    nft_id: AccountId,
 }
 
 #[derive(Deserialize)]
@@ -21,7 +23,7 @@ pub enum ProposalKinds {
     ChangePolicyRemoveRole {  },
     ChangePolicyUpdateDefaultVotePolicy {  },
     ChangePolicyUpdateParameters {  },
-    AddMemberToRole {  },
+    AddMemberToRole { memberId: AccountId },
     RemoveMemberFromRole {  },
     FunctionCall {  },
     UpgradeSelf {  },
@@ -66,6 +68,7 @@ trait Callbacks {
 impl Default for Daobot {
     fn default() -> Self {
         Self {
+            nft_id: AccountId::from(""),
         }
     }
 }
@@ -76,12 +79,12 @@ pub const GAS_MARGIN: u64 = 10_000_000_000_000;
 #[near_bindgen]
 impl Daobot {
 
-    pub fn approve_members(&self, dao_id: AccountId) {
-    
+    pub fn approve_members(&mut self, dao_id: AccountId, nft_id: AccountId)  {
+        self.nft_id = nft_id;
         let callback = ext_self::on_get_last_proposal_id( dao_id.clone(), &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_VIEW - GAS_MARGIN);
         ext_astrodao::get_last_proposal_id(&dao_id, 0, GAS_FOR_DAO_VIEW).then(callback);
 
-}
+    }
 
     #[private]
     pub fn on_get_last_proposal_id(&self, dao_id: AccountId, #[callback] last_proposal_id: u64) {
@@ -96,23 +99,26 @@ impl Daobot {
     #[private]
     pub fn on_get_proposals(&self, dao_id: &near_sdk::AccountId, #[callback] proposals: Vec<Proposal>)  {
         
-        let mut active_proposals = proposals.iter().filter(|p| p.status == "InProgress".to_string() && p.kind == ProposalKinds::AddMemberToRole{} ).peekable();
+        let mut active_proposals = proposals.iter().filter(|p| p.status == "InProgress".to_string() && match p.kind {
+            ProposalKinds::AddMemberToRole { memberId: _ } => true,
+            _ => false,
+        } ).peekable();
+        
         if active_proposals.peek().is_none() {
             panic!("No active proposals");
         }
-         let proposal_ids = active_proposals.map(|p| p.id).collect::<Vec<u64>>();
-        let proposal_id_count = (proposal_ids.len()) as u64;
+        let proposal_count = (active_proposals.count()) as u64;
         
         const ESTIMATED_USED_GAS: u64 = 7e12 as u64;
         let remaining_gas = env::prepaid_gas() - env::used_gas() - ESTIMATED_USED_GAS;
         // 2 calls plus one extra for overhead
         const CALLS_PER_LOOP: u64 = 3;
-        let gas_per_call = remaining_gas / (proposal_id_count * CALLS_PER_LOOP);
+        let gas_per_call = remaining_gas / (proposal_count * CALLS_PER_LOOP);
         log!("Gas per call: {:?}", gas_per_call);
-        proposal_ids.iter().for_each(|id| {  
+        active_proposals.for_each(|p| {  
             log!("Remaining gas: {:?}", env::prepaid_gas() - env::used_gas());
             // let approved =
-              ext_self::proposal_approved(*id, &env::current_account_id(),0, gas_per_call);
+              ext_self::proposal_approved(p.id, &env::current_account_id(),0, gas_per_call);
             //ext_astrodao::act_proposal(*id, "VoteApprove".to_string(), &dao_id, 0, gas_per_call).then(approved);
         });
       
