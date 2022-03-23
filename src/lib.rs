@@ -66,7 +66,7 @@ pub trait NftEnumOwners {
 // Recieve callbacks from external contract.
 #[ext_contract(ext_self)]
 trait Callbacks {
-    fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>);
+    // fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>);
     fn on_get_proposal(&self, #[callback] proposal: Proposal);
     fn on_get_last_proposal_id(&self, #[callback] last_proposal_id: u64);
     fn on_approve_proposal(&self, proposal_id: u64, #[callback] nft_supply: U128);
@@ -108,55 +108,59 @@ impl Daobot {
         // .then(callback);
     }
 
-    #[private]
-    pub fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>)  {
+    // #[private]
+    // pub fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>)  {
         
-        let mut active_proposals = proposals.iter().filter(|p| p.status == "InProgress".to_string() && match p.kind {
-            ProposalKinds::AddMemberToRole { member_id: _ } => true,
-            _ => false,
-        } ).peekable();
+    //     let mut active_proposals = proposals.iter().filter(|p| p.status == "InProgress".to_string() && match p.kind {
+    //         ProposalKinds::AddMemberToRole { member_id: _ } => true,
+    //         _ => false,
+    //     } ).peekable();
         
-        if active_proposals.peek().is_none() {
-            panic!("No active proposals");
-        }
-        let proposal_count = (active_proposals.clone().count()) as u64;
+    //     if active_proposals.peek().is_none() {
+    //         panic!("No active proposals");
+    //     }
+    //     let proposal_count = (active_proposals.clone().count()) as u64;
         
-        const ESTIMATED_USED_GAS: u64 = 7e12 as u64;
-        let remaining_gas = env::prepaid_gas() - env::used_gas() - ESTIMATED_USED_GAS;
-        // 2 calls plus one extra for overhead
-        const CALLS_PER_LOOP: u64 = 4;
-        let gas_per_call = remaining_gas / (proposal_count * CALLS_PER_LOOP);
-        log!("Gas per call: {:?}", gas_per_call);
-        active_proposals.for_each(|p| {  
-            log!("Remaining gas: {:?}", env::prepaid_gas() - env::used_gas());
-            let callback = ext_self::on_approve_proposal(p.id, &env::current_account_id(), 0, gas_per_call);
-            ext_nft_enum::nft_supply_for_owner(match &p.kind {
-                ProposalKinds::AddMemberToRole { member_id } => member_id.to_owned(),
-                _ => panic!("Unexpected proposal kind"),
-            }, &self.nft_id, 0, gas_per_call).then(callback);
+    //     const ESTIMATED_USED_GAS: u64 = 7e12 as u64;
+    //     let remaining_gas = env::prepaid_gas() - env::used_gas() - ESTIMATED_USED_GAS;
+    //     // 2 calls plus one extra for overhead
+    //     const CALLS_PER_LOOP: u64 = 4;
+    //     let gas_per_call = remaining_gas / (proposal_count * CALLS_PER_LOOP);
+    //     log!("Gas per call: {:?}", gas_per_call);
+    //     active_proposals.for_each(|p| {  
+    //         log!("Remaining gas: {:?}", env::prepaid_gas() - env::used_gas());
+    //         let callback = ext_self::on_approve_proposal(p.id, &env::current_account_id(), 0, gas_per_call);
+    //         ext_nft_enum::nft_supply_for_owner(match &p.kind {
+    //             ProposalKinds::AddMemberToRole { member_id } => member_id.to_owned(),
+    //             _ => panic!("Unexpected proposal kind"),
+    //         }, &self.nft_id, 0, gas_per_call).then(callback);
 
-        });
-    }
+    //     });
+    // }
 
     #[private]
     pub fn on_approve_proposal(&self, proposal_id: u64, #[callback] nft_supply: U128) {
-        const ESTIMATED_USED_GAS: u64 = 7e12 as u64;
-        let remaining_gas = env::prepaid_gas() - env::used_gas() - ESTIMATED_USED_GAS;
         if nft_supply.0 > 0 {
-            let approved = ext_self::proposal_approved(proposal_id, &env::current_account_id(),0, GAS_FOR_DAO_CALL);
+            let approved = ext_self::proposal_approved(proposal_id, &env::current_account_id(),0, env::prepaid_gas() - env::used_gas() - GAS_FOR_DAO_CALL - GAS_MARGIN);
             ext_astrodao::act_proposal(proposal_id, "VoteApprove".to_string(), &self.dao_id, 0, GAS_FOR_DAO_CALL).then(approved);
         } else {
-            let rejected = ext_self::proposal_rejected(proposal_id, &env::current_account_id(),0, GAS_FOR_DAO_CALL);
+            let rejected = ext_self::proposal_rejected(proposal_id, &env::current_account_id(),0, env::prepaid_gas() - env::used_gas() - GAS_FOR_DAO_CALL - GAS_MARGIN);
             ext_astrodao::act_proposal(proposal_id, "VoteReject".to_string(), &self.dao_id, 0, GAS_FOR_DAO_CALL).then(rejected);
         }
 }
 
     #[private]
-    pub fn on_get_proposal(&self, #[callback] proposals: Proposal)  {
+    pub fn on_get_proposal(&self, #[callback] proposal: Proposal)  {
 
-        let proposal_id = proposals.id;
-        //let cb = ext_self::proposal_approved(proposal_id, &env::current_account_id(),0, gas_per_call);
-        ext_astrodao::act_proposal(proposal_id, "VoteApprove".to_string(), &self.dao_id, 0, GAS_FOR_DAO_CALL);
+        let proposal_id = proposal.id;
+        let user_id = match proposal.kind {
+            ProposalKinds::AddMemberToRole { member_id } => member_id.to_owned(),
+            _ => panic!("Unexpected proposal kind"),
+        };
+
+        let callback = ext_self::on_approve_proposal(proposal_id, &env::current_account_id(), 0, env::prepaid_gas() - env::used_gas() - GAS_FOR_DAO_VIEW - GAS_MARGIN);
+        ext_nft_enum::nft_supply_for_owner(user_id, &self.nft_id, 0, GAS_FOR_DAO_VIEW).then(callback);
+
     }
 
     #[private]

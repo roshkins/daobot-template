@@ -29,6 +29,7 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
       changeMethods: ["add_proposal"],
       sender: wallet.getAccountId()
     });
+    
 
     const policy = await daocontract.get_policy();
     const newRole = { ...policy.roles[1], name: "DAO Bot", kind: { Group: [contract.contractId] } };
