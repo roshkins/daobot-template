@@ -22,7 +22,7 @@ pub enum ProposalKinds {
     ChangePolicyRemoveRole {  },
     ChangePolicyUpdateDefaultVotePolicy {  },
     ChangePolicyUpdateParameters {  },
-    AddMemberToRole { memberId: AccountId },
+    AddMemberToRole { member_id: AccountId },
     RemoveMemberFromRole {  },
     FunctionCall {  },
     UpgradeSelf {  },
@@ -84,7 +84,7 @@ impl Default for Daobot {
 }
 pub const GAS_FOR_DAO_VIEW: u64 = 6_000_000_000_000;
 pub const GAS_FOR_DAO_CALL: u64 = 10_000_000_000_000;
-pub const GAS_MARGIN: u64 = 10_000_000_000_000;
+pub const GAS_MARGIN: u64 = 12_000_000_000_000;
 
 #[near_bindgen]
 impl Daobot {
@@ -92,14 +92,15 @@ impl Daobot {
     pub fn approve_members(&mut self, dao_id: AccountId, nft_id: AccountId)  {
         self.nft_id = nft_id;
         self.dao_id = dao_id;
-        let callback = ext_self::on_get_last_proposal_id (&env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_VIEW - GAS_MARGIN);
+        log!("before x-contract in approve_members prepaid_gas {}, used_gas: {}", env::prepaid_gas(), env::used_gas());
+        let callback = ext_self::on_get_last_proposal_id (&env::current_account_id(), 0, env::prepaid_gas() - (env::used_gas() + GAS_FOR_DAO_VIEW + GAS_MARGIN));
         ext_astrodao::get_last_proposal_id(&self.dao_id,0, GAS_FOR_DAO_VIEW).then(callback);
-
+        log!("contract call scheduled");
     }
 
     #[private]
     pub fn on_get_last_proposal_id(&self, #[callback] last_proposal_id: u64) {
-        
+        log!("In get_last_proposal_id");
         // let callback = ext_self::on_get_proposals(dao_id.clone(),&env::current_account_id(), 0, gas_per_call);
         let mono_callback = ext_self::on_get_proposal(&env::current_account_id(), 0, env::prepaid_gas() - env::used_gas()- GAS_FOR_DAO_VIEW - GAS_MARGIN);
         ext_astrodao::get_proposal(last_proposal_id-1, &self.dao_id, 0, GAS_FOR_DAO_VIEW).then(mono_callback);
@@ -111,7 +112,7 @@ impl Daobot {
     pub fn on_get_proposals(&self, #[callback] proposals: Vec<Proposal>)  {
         
         let mut active_proposals = proposals.iter().filter(|p| p.status == "InProgress".to_string() && match p.kind {
-            ProposalKinds::AddMemberToRole { memberId: _ } => true,
+            ProposalKinds::AddMemberToRole { member_id: _ } => true,
             _ => false,
         } ).peekable();
         
@@ -130,7 +131,7 @@ impl Daobot {
             log!("Remaining gas: {:?}", env::prepaid_gas() - env::used_gas());
             let callback = ext_self::on_approve_proposal(p.id, &env::current_account_id(), 0, gas_per_call);
             ext_nft_enum::nft_supply_for_owner(match &p.kind {
-                ProposalKinds::AddMemberToRole { memberId } => memberId.to_owned(),
+                ProposalKinds::AddMemberToRole { member_id } => member_id.to_owned(),
                 _ => panic!("Unexpected proposal kind"),
             }, &self.nft_id, 0, gas_per_call).then(callback);
 
@@ -139,6 +140,8 @@ impl Daobot {
 
     #[private]
     pub fn on_approve_proposal(&self, proposal_id: u64, #[callback] nft_supply: U128) {
+        const ESTIMATED_USED_GAS: u64 = 7e12 as u64;
+        let remaining_gas = env::prepaid_gas() - env::used_gas() - ESTIMATED_USED_GAS;
         if nft_supply.0 > 0 {
             let approved = ext_self::proposal_approved(proposal_id, &env::current_account_id(),0, GAS_FOR_DAO_CALL);
             ext_astrodao::act_proposal(proposal_id, "VoteApprove".to_string(), &self.dao_id, 0, GAS_FOR_DAO_CALL).then(approved);
