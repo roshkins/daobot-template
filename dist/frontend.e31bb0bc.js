@@ -32292,26 +32292,28 @@ function Form(_ref) {
     id: "fieldset"
   }, /*#__PURE__*/_react.default.createElement("p", null), /*#__PURE__*/_react.default.createElement("p", {
     className: "highlight"
-  }, /*#__PURE__*/_react.default.createElement("label", {
-    htmlFor: "message"
+  }, /*#__PURE__*/_react.default.createElement("div", null, /*#__PURE__*/_react.default.createElement("label", {
+    htmlFor: "accountId"
   }, "DAO account id:"), /*#__PURE__*/_react.default.createElement("input", {
     autoFocus: true,
     id: "accountId",
+    name: "accountId",
     required: true,
     value: daoId,
     onChange: e => {
       setDaoId(e.target.value);
     }
-  }), /*#__PURE__*/_react.default.createElement("label", {
+  })), /*#__PURE__*/_react.default.createElement("div", null, /*#__PURE__*/_react.default.createElement("label", {
     htmlFor: "nft"
   }, "NFT id:"), /*#__PURE__*/_react.default.createElement("input", {
-    id: "nftId",
+    id: "nft",
+    name: "nft",
     required: true,
     value: nftId,
     onChange: e => {
       setNftId(e.target.value);
     }
-  })), /*#__PURE__*/_react.default.createElement("button", {
+  }))), /*#__PURE__*/_react.default.createElement("button", {
     type: "submit"
   }, "Connect")));
 }
@@ -49099,7 +49101,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "43301" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "35265" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};
