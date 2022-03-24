@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-export default function Form({ onSubmit, daoId, setDaoId, currentUser }) {
+export default function Form({ onSubmit, daoId, setDaoId, nftId, setNftId, currentUser }) {
     return (
         <form onSubmit={onSubmit}>
             <fieldset id="fieldset">
@@ -14,6 +14,13 @@ export default function Form({ onSubmit, daoId, setDaoId, currentUser }) {
                         required
                         value={daoId}
                         onChange={(e) => { setDaoId(e.target.value); }}
+                    />
+                    <label htmlFor="nft">NFT id:</label>
+                    <input
+                        id="nftId"
+                        required
+                        value={nftId}
+                        onChange={(e) => { setNftId(e.target.value); }}
                     />
                 </p>
                 <button type="submit">

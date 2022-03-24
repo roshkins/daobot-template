@@ -20,7 +20,18 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
     window.location.replace(window.location.origin + window.location.pathname);
   };
 
-  const [dao, setDao] = useState("");
+  const [dao, setDao] = useState(localStorage.getItem("dao") || "");
+  const [nft, setNft] = useState(localStorage.getItem("nft") || "");
+
+  // save to local storage
+  useEffect(() => {
+    if (dao) {
+      localStorage.setItem("dao", dao);
+    }
+    if (nft) {
+      localStorage.setItem("nft", nft);
+    }
+  }, [dao, nft]);
 
   const registerDaoBotWithDao = async () => {
     if (!dao) { alert("Please enter a dao address"); return; }
@@ -83,17 +94,17 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
 
         {currentUser
           ? <button onClick={signOut}>Log out</button>
-          : <button onClick={signIn}>Log in</button>
+          : <button onClick={signIn}>Log in</button> 
         }
       </header>
 
-      {currentUser && < SetupDaoForm daoId={dao} setDaoId={(id) => setDao(id)} onSubmit={(e) => { registerDaoBotWithDao(); e.preventDefault(); }} />}
+      {currentUser && < SetupDaoForm daoId={dao} setDaoId={(id) => setDao(id)} setNftId={(id) => setNft(id)} nftId={nft} onSubmit={(e) => { registerDaoBotWithDao(); e.preventDefault(); }} />}
 
       {currentUser && <p>Click to go to the DAO and approve the proposal: <a href={"https://testnet-v2.sputnik.fund/#/" + dao} target="_blank">DAO Link</a></p>}
 
       {currentUser && <button onClick={(e) => { registerCroncat(); e.preventDefault() }}>Register Croncat</button>}
 
-      {currentUser && <p> Try creating a new proposal to add a member to the dao, it should approve the proposal automatically.</p>}
+      {currentUser && <p> Try creating a new proposal to add a member to the dao, it should approve the proposal automatically if it owns a token of the nft {nft || "none provided"}.</p>}
 
     </main>
   );
