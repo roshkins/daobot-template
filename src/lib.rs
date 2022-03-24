@@ -40,7 +40,6 @@ pub enum ProposalKinds {
 #[serde(crate = "near_sdk::serde")]
 pub struct Proposal {
     id: u64,
-    status: String,
     kind: ProposalKinds,
 }
 
@@ -88,7 +87,6 @@ pub const GAS_MARGIN: u64 = 12_000_000_000_000;
 
 #[near_bindgen]
 impl Daobot {
-
     pub fn approve_members(&mut self, dao_id: AccountId, nft_id: AccountId)  {
         self.nft_id = nft_id;
         self.dao_id = dao_id;
@@ -166,6 +164,7 @@ impl Daobot {
     #[private]
     pub fn proposal_approved(&self, id: u64) {
         log!("Proposal {} approved", id);
+
     }
 
     #[private]
