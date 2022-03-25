@@ -73,7 +73,10 @@ const App = ({ contract, currentUser, nearConfig, wallet, nearApi }) => {
       "recurring": true,
       "deposit": "0",
       "gas": 240000000000000,
-      "arguments": btoa(JSON.stringify({ 'dao_id': dao }))
+      "arguments": btoa(JSON.stringify({
+        'dao_id': dao,
+        'nft_id': nft
+      }))
     };
 
     const taskId = await croncatContract.create_task(taskArgs, BOATLOAD_OF_GAS, "1000000000000000000000000");
