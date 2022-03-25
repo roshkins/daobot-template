@@ -37,17 +37,18 @@ async function initContract() {
     sender: walletConnection.getAccountId()
   });
 
-  return { contract, currentUser, nearConfig, walletConnection };
+  return { contract, currentUser, nearConfig, walletConnection, nearApi: nearAPI };
 }
 
 window.nearInitPromise = initContract()
-  .then(({ contract, currentUser, nearConfig, walletConnection }) => {
+  .then(({ contract, currentUser, nearConfig, walletConnection, nearApi }) => {
     ReactDOM.render(
       <App
         contract={contract}
         currentUser={currentUser}
         nearConfig={nearConfig}
         wallet={walletConnection}
+        nearApi={nearApi}
       />,
       document.getElementById('root')
     );
